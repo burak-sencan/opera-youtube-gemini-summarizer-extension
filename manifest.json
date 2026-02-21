@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Gemini Özetleyici",
+  "version": "0.1",
+  "description": "YouTube videolarının transkriptini alıp Gemini ile özetler.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://*.googleapis.com/*"
+  ],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content_script.js"]
+    }
+  ],
+  "options_page": "options.html",
+  "action": {"default_popup": "popup.html", "default_title": "Özetle (Gemini)"}
+}

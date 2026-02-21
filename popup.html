@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"/><title>Özetle</title></head>
+<body>
+  <style>
+    body{ margin:0; padding:12px; width:260px; background:#0f0f10; color:#f5f5f5; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    button{ width:100%; cursor:pointer; background:rgba(255,255,255,.10); color:#f5f5f5; border:1px solid rgba(255,255,255,.16); border-radius:10px; padding:10px 12px; font-weight:650; font-size:14px; }
+    button:hover{ background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.22); }
+    .secondary{ margin-top:8px; background:rgba(255,255,255,.06); font-weight:600; }
+    #msg{ margin-top:10px; font-size:12px; opacity:.85; line-height:1.35; }
+  </style>
+  <button id="summarize">Videoyu Gemini ile Özetle</button>
+  <button id="openOptions" class="secondary">Ayarlar</button>
+  <div id="msg">Bir YouTube video sayfası (watch) açık olmalı.</div>
+  <script src="popup.js"></script>
+</body>
+</html>

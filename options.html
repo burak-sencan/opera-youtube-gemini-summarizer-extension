@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Gemini Özetleyici - Ayarlar</title>
+  <style>
+    body{ max-width:720px; margin:20px auto; padding:0 16px; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    input, select{ box-sizing:border-box; margin:6px 0 14px 0; padding:10px 12px; border-radius:10px; border:1px solid rgba(0,0,0,.18); }
+    button{ cursor:pointer; border-radius:10px; padding:10px 12px; border:1px solid rgba(0,0,0,.18); background:#111; color:#fff; font-weight:650; }
+    button:hover{ opacity:.92; }
+    label{ font-weight:650; }
+    #status{ margin-top:10px; }
+  </style>
+</head>
+<body>
+  <h3>Gemini Özetleyici Ayarları</h3>
+  <label>API Key (Google AI Studio):</label><br/>
+  <input id="apikey" style="width:100%" placeholder="AIza..."/><br/>
+  <div style="font-size:12px; opacity:0.8; margin:6px 0 12px 0;">
+    Not: Sadece API key girmeniz yeterli.
+  </div>
+
+  <label>Model:</label><br/>
+  <select id="model" style="width:100%;">
+    <option value="">Otomatik (önerilen)</option>
+  </select>
+  <div id="modelStatus" style="font-size:12px; opacity:0.8; margin:6px 0 12px 0;"></div>
+
+  <label>Özet Dili:</label><br/>
+  <input id="language" style="width:100%" value="Türkçe"/><br/>
+
+  <label>Özet Formatı:</label><br/>
+  <select id="summaryFormat" style="width:100%;">
+    <option value="tldr_bullets">Kısa Özet + Maddeler</option>
+    <option value="bullets">Maddeler</option>
+    <option value="paragraph">Tek paragraf</option>
+    <option value="detailed">Detaylı inceleme</option>
+  </select>
+  <br/>
+
+  <h3 style="margin-top:18px;">Görünüm</h3>
+  <label>Drawer yazı boyutu (px):</label><br/>
+  <input id="drawerFontSize" type="number" min="12" max="22" step="1" style="width:100%" placeholder="15"/><br/>
+
+  <label>Drawer genişliği (px):</label><br/>
+  <input id="drawerWidth" type="number" min="320" max="720" step="10" style="width:100%" placeholder="440"/><br/>
+  <div style="font-size:12px; opacity:0.8; margin:-6px 0 12px 0;">
+    Not: Drawer’ı soldaki tutamaktan sürükleyerek de genişletebilirsiniz.
+  </div>
+
+  <button id="save">Kaydet</button>
+  <div id="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+One-click Gemini summaries for YouTube videos using the page title, description, and transcript (when available), shown in an in-page drawer.
