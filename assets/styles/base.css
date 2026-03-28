@@ -1,0 +1,13 @@
+/* Shared base styles for all extension pages. */
+
+*{ box-sizing:border-box; }
+
+html,
+body{ margin:0; padding:0; }
+
+body{
+  color:#0f1724;
+  font-family:"Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.hidden{ display:none !important; }

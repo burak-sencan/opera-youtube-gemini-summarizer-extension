@@ -407,7 +407,7 @@
           <td><div class="meta-stack">${createdAt}</div></td>
           <td>
             <button class="btn" data-edit-id="${id}">Duzenle</button>
-            ${videoUrl ? `<a class="btn" style="margin-top:4px;" target="_blank" rel="noopener" href="${videoUrl}">Ac</a>` : ''}
+            ${videoUrl ? `<a class="btn table-action-link" target="_blank" rel="noopener" href="${videoUrl}">Ac</a>` : ''}
           </td>
         </tr>
       `;

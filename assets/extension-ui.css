@@ -1,0 +1,12 @@
+/*
+  Legacy compatibility stylesheet.
+  Prefer page-specific entry files:
+  - assets/popup.css
+  - assets/options.css
+  - assets/dashboard.css
+*/
+
+@import url("./styles/base.css");
+@import url("./styles/popup.css");
+@import url("./styles/options.css");
+@import url("./styles/dashboard.css");

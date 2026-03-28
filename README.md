@@ -24,7 +24,7 @@ Not: Kodda değişiklik yaptıktan sonra uzantılar sayfasında **Reload** ile y
 
 ### Ayarlar
 - Uzantı > Seçenekler kısmından sadece `API Key (Google AI Studio)` girmeniz yeterli.
-- `Özet Formatı` ile çıktı tipini seçebilirsiniz (TL;DR + Maddeler / Maddeler / Tek paragraf / Detaylı inceleme).
+- `Özet Formatı` ile çıktı tipini seçebilirsiniz: `Özet` veya `Detaylı Özet`.
 
 ### Model
 - Varsayılan: Otomatik (hesabınıza uygun bir modeli ListModels ile bulup kullanır).
@@ -86,7 +86,7 @@ Note: After making code changes, go to the extensions page and click **Reload**.
 
 ### Settings
 - Add your `API Key (Google AI Studio)` in the extension Options.
-- Choose an output format (TL;DR + bullets / bullets / single paragraph / detailed review).
+- Choose one of two output modes: `Summary` or `Detailed Summary`.
 
 ### Model
 - Default: Automatic (uses ListModels to pick a compatible model for your key).

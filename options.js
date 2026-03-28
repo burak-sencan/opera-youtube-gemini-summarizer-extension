@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const drawerWidth = document.getElementById('drawerWidth');
   const status = document.getElementById('status');
 
+  function normalizeSummaryFormat(value){
+    const mode = String(value || '').trim().toLowerCase();
+    if(mode === 'detailed' || mode === 'detayli' || mode === 'detayli_ozet') return 'detailed';
+    if(mode === 'summary' || mode === 'ozet' || mode === 'simple' || mode === 'tldr_bullets' || mode === 'bullets' || mode === 'paragraph') return 'summary';
+    return 'summary';
+  }
+
   function setModelStatus(text){
     if(!modelStatus) return;
     modelStatus.textContent = text || '';
@@ -85,7 +92,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     apikey.value = cfg.apiKey || '';
     model.value = cfg.apiModel || '';
     language.value = cfg.language || 'Türkçe';
-    summaryFormat.value = cfg.summaryFormat || 'simple';
+    const normalizedSummaryFormat = normalizeSummaryFormat(cfg.summaryFormat);
+    summaryFormat.value = normalizedSummaryFormat;
+    if((cfg.summaryFormat || '') !== normalizedSummaryFormat){
+      chrome.storage.local.set({summaryFormat: normalizedSummaryFormat}, ()=>{});
+    }
     drawerFontSize.value = cfg.drawerFontSize || 15;
     drawerWidth.value = cfg.drawerWidth || 440;
 
@@ -104,7 +115,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       apiKey: apikey.value.trim(),
       apiModel: (model && model.value ? model.value.trim() : ''),
       language: language.value.trim(),
-      summaryFormat: summaryFormat.value,
+      summaryFormat: normalizeSummaryFormat(summaryFormat.value),
       drawerFontSize: fontSizeNum,
       drawerWidth: widthNum
     }, ()=>{

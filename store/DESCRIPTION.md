@@ -6,7 +6,7 @@ Summarize YouTube videos using Gemini. The extension reads the current YouTube p
 - One-click summary: Start summarizing from the extension popup.
 - In-page drawer: The result is shown in a right-side drawer on the YouTube page.
 - Video cards across YouTube: On Home, Subscriptions, Search, and many Channel lists, a **Summarize** button appears on supported video cards.
-- Summary formats: TL;DR + bullets / bullets / single paragraph / detailed review.
+- Summary modes: Summary / Detailed Summary.
 - Model selection: Automatic (recommended) or manually choose a model from the settings list.
 - Rate-limit aware fallback: If a model is rate-limited/unavailable, it tries another compatible model.
 

@@ -1,0 +1,62 @@
+/* options.html */
+
+body.page-options{
+  background:#ffffff;
+}
+
+.settings-page{
+  max-width:720px;
+  margin:20px auto;
+  padding:0 16px 20px 16px;
+}
+
+.settings-title{
+  margin:0 0 12px 0;
+  font-size:20px;
+}
+
+.settings-section-title{
+  margin:18px 0 10px 0;
+  font-size:16px;
+}
+
+.settings-field{ margin-bottom:14px; }
+
+.settings-label{
+  display:block;
+  margin-bottom:6px;
+  font-weight:650;
+}
+
+.settings-control{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,.18);
+  background:#fff;
+  color:#111;
+  font-size:14px;
+}
+
+.settings-hint{
+  font-size:12px;
+  opacity:.8;
+  margin:6px 0 0 0;
+}
+
+.settings-hint-tight{ margin-top:-6px; }
+
+.settings-action-btn{
+  cursor:pointer;
+  border-radius:10px;
+  padding:10px 12px;
+  border:1px solid rgba(0,0,0,.18);
+  background:#111;
+  color:#fff;
+  font-weight:650;
+}
+
+.settings-action-btn:hover{ opacity:.92; }
+
+.settings-status{ margin-top:10px; min-height:18px; }
