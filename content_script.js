@@ -11,6 +11,30 @@
   console.debug('[GeminiSummary] content script loaded', location.href);
 
   let activeRequestId = null;
+  let summaryPending = false;
+  let pendingSummarySource = null;
+  let latestSummaryContext = null;
+  let drawerSaveResetTimer = null;
+  const SUMMARY_PENDING_TIMEOUT_MS = 75_000;
+  let summaryPendingTimeoutHandle = null;
+
+  function clearSummaryPendingTimeout(){
+    if(!summaryPendingTimeoutHandle) return;
+    clearTimeout(summaryPendingTimeoutHandle);
+    summaryPendingTimeoutHandle = null;
+  }
+
+  function setSummaryPending(isPending){
+    summaryPending = !!isPending;
+    clearSummaryPendingTimeout();
+    if(!summaryPending) return;
+
+    summaryPendingTimeoutHandle = setTimeout(()=>{
+      summaryPendingTimeoutHandle = null;
+      summaryPending = false;
+      showSummaryDrawer('Ozetleme istegi zaman asimina ugradi. Lutfen tekrar deneyin.', 'Hata', false);
+    }, SUMMARY_PENDING_TIMEOUT_MS);
+  }
 
   const uiDefaults = {
     drawerFontSize: 15,
@@ -28,7 +52,7 @@
         const fs = parseInt(cfg.drawerFontSize, 10);
         const w = parseInt(cfg.drawerWidth, 10);
         uiSettings.drawerFontSize = Number.isFinite(fs) ? Math.max(12, Math.min(22, fs)) : uiDefaults.drawerFontSize;
-        uiSettings.drawerWidth = Number.isFinite(w) ? Math.max(320, Math.min(720, w)) : uiDefaults.drawerWidth;
+        uiSettings.drawerWidth = Number.isFinite(w) ? Math.max(320, Math.min(1440, w)) : uiDefaults.drawerWidth;
         applyUiToExistingDrawer();
       });
     } catch (e) {}
@@ -61,17 +85,17 @@
     const style = document.createElement('style');
     style.id = 'gemini-summary-styles';
     style.textContent = `
-      .gemini-summary-btn-wrap{ position: relative !important; }
-      .gemini-summary-hover-btn{
+      .gemini-summary-card{ position: relative !important; }
+      .gemini-summary-btn-host{ position: relative !important; }
+      .gemini-summary-card-btn{
         position:absolute;
         top:8px;
-        left:50%;
-        right:auto;
-        transform: translateX(-50%);
-        z-index: 2;
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity .12s ease-in-out;
+        right:8px;
+        transform: translateY(0);
+        z-index: 30;
+        opacity: .94;
+        pointer-events: auto;
+        transition: opacity .12s ease-in-out, transform .12s ease-in-out;
         background: rgba(15,15,16,.88);
         color: #f5f5f5;
         border: 1px solid rgba(255,255,255,.16);
@@ -83,37 +107,177 @@
         cursor: pointer;
         box-shadow: 0 6px 16px rgba(0,0,0,.35);
       }
-      .gemini-summary-hover-btn:hover{ background: rgba(15,15,16,.96); border-color: rgba(255,255,255,.22); }
-      .gemini-summary-btn-wrap:hover .gemini-summary-hover-btn,
-      .gemini-summary-btn-wrap:focus-within .gemini-summary-hover-btn{
+      .gemini-summary-card-btn:hover{ background: rgba(15,15,16,.96); border-color: rgba(255,255,255,.22); }
+      .gemini-summary-card-btn:focus-visible{
+        outline: 2px solid rgba(255,255,255,.72);
+        outline-offset: 1px;
+      }
+      .gemini-summary-btn-host:hover .gemini-summary-card-btn,
+      .gemini-summary-btn-host:focus-within .gemini-summary-card-btn,
+      .gemini-summary-card:hover .gemini-summary-card-btn,
+      .gemini-summary-card:focus-within .gemini-summary-card-btn{
         opacity: 1;
-        pointer-events: auto;
+        transform: translateY(-1px);
       }
     `;
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function isSubscriptionsPage(){
-    try{
-      return location.pathname === '/feed/subscriptions';
-    }catch(e){
-      return false;
-    }
-  }
+  /* isSubscriptionsPage removed — buttons now appear on all YouTube pages */
 
   function toAbsoluteUrl(href){
     try{ return new URL(href, location.origin).toString(); }catch(e){ return ''; }
   }
 
-  function requestSummaryByUrl(url, title){
-    if(!url) return;
+  function normalizeVideoUrl(url){
+    try{
+      const u = new URL(url, location.origin);
+      const videoId = getVideoIdFromUrl(u.toString());
+      if(videoId) return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+      return u.toString();
+    }catch(e){
+      return String(url || '').trim();
+    }
+  }
+
+  function normalizeUploadDate(value){
+    const raw = String(value || '').trim();
+    if(!raw) return '';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const d = new Date(raw);
+    if(Number.isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  }
+
+  function requestSummaryByUrl(url, title, channelName){
+    if(summaryPending){
+      showSummaryDrawer('Ozet zaten hazirlaniyor. Lutfen bekleyin.', title || 'Gemini ile ozetle', true);
+      return;
+    }
+    const normalizedUrl = normalizeVideoUrl(url);
+    if(!normalizedUrl) return;
     const vid = (function(){
-      try{ return new URL(url).searchParams.get('v'); }catch(e){ return null; }
+      try{ return new URL(normalizedUrl).searchParams.get('v'); }catch(e){ return null; }
     })();
     const requestId = newRequestId();
     activeRequestId = requestId;
+    pendingSummarySource = {
+      requestId,
+      source: 'card',
+      url: normalizedUrl,
+      videoId: vid || getVideoIdFromUrl(normalizedUrl),
+      title: String(title || '').trim(),
+      channelName: String(channelName || '').trim(),
+      uploadDate: ''
+    };
+    setSummaryPending(true);
     showSummaryDrawer('Özet hazırlanıyor...', title || 'Gemini ile özetle', true);
-    chrome.runtime.sendMessage({action:'summarize_url', url, title, videoId: vid, requestId}, ()=>{});
+    chrome.runtime.sendMessage({action:'summarize_url', url: normalizedUrl, title, videoId: vid, requestId}, (resp)=>{
+      const runtimeError = chrome.runtime.lastError;
+      if(runtimeError){
+        setSummaryPending(false);
+        showSummaryDrawer(runtimeError.message || 'Arka plan iletisi başarısız oldu.', 'Hata', false);
+        return;
+      }
+      if(resp && resp.ok === false){
+        setSummaryPending(false);
+        showSummaryDrawer(resp.error || 'Özetleme isteği başarısız oldu.', 'Hata', false);
+      }
+    });
+  }
+
+  function hasSavableSummaryContext(){
+    return !!(latestSummaryContext && typeof latestSummaryContext === 'object' && String(latestSummaryContext.summary || '').trim());
+  }
+
+  function getDrawerSaveButton(){
+    return document.getElementById('gemini-drawer-save-btn');
+  }
+
+  function updateDrawerSaveButtonState(){
+    const saveBtn = getDrawerSaveButton();
+    if(!saveBtn) return;
+    const canSave = !summaryPending && hasSavableSummaryContext();
+    saveBtn.disabled = !canSave;
+    saveBtn.style.opacity = canSave ? '1' : '0.58';
+    saveBtn.style.cursor = canSave ? 'pointer' : 'not-allowed';
+    saveBtn.title = canSave ? 'Son özeti kaydet' : 'Önce bir özet oluşturun';
+  }
+
+  function flashDrawerSaveButton(text, tone){
+    const saveBtn = getDrawerSaveButton();
+    if(!saveBtn) return;
+
+    if(drawerSaveResetTimer){
+      clearTimeout(drawerSaveResetTimer);
+      drawerSaveResetTimer = null;
+    }
+
+    saveBtn.textContent = String(text || 'Kaydet');
+    if(tone === 'ok'){
+      saveBtn.style.borderColor = 'rgba(83,181,127,.65)';
+      saveBtn.style.background = 'rgba(83,181,127,.16)';
+    } else if(tone === 'error'){
+      saveBtn.style.borderColor = 'rgba(230,96,96,.65)';
+      saveBtn.style.background = 'rgba(230,96,96,.16)';
+    } else {
+      saveBtn.style.borderColor = 'rgba(255,255,255,.14)';
+      saveBtn.style.background = 'rgba(255,255,255,.08)';
+    }
+
+    drawerSaveResetTimer = setTimeout(()=>{
+      drawerSaveResetTimer = null;
+      const btn = getDrawerSaveButton();
+      if(!btn) return;
+      btn.textContent = 'Kaydet';
+      btn.style.borderColor = 'rgba(255,255,255,.14)';
+      btn.style.background = 'rgba(255,255,255,.08)';
+      updateDrawerSaveButtonState();
+    }, 1500);
+  }
+
+  function saveCurrentSummaryFromDrawer(){
+    if(summaryPending){
+      flashDrawerSaveButton('Bekleyin', 'error');
+      return;
+    }
+
+    const context = hasSavableSummaryContext() ? latestSummaryContext : null;
+    if(!context){
+      flashDrawerSaveButton('Önce özet', 'error');
+      return;
+    }
+
+    const saveBtn = getDrawerSaveButton();
+    if(saveBtn){
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = '0.72';
+      saveBtn.textContent = 'Kaydediliyor';
+    }
+
+    chrome.runtime.sendMessage({action:'save_analysis', record: context}, (resp)=>{
+      const runtimeError = chrome.runtime.lastError;
+      if(runtimeError){
+        flashDrawerSaveButton('Hata', 'error');
+        updateDrawerSaveButtonState();
+        return;
+      }
+
+      if(resp && resp.ok){
+        flashDrawerSaveButton('Kaydedildi', 'ok');
+        updateDrawerSaveButtonState();
+        return;
+      }
+
+      flashDrawerSaveButton('Hata', 'error');
+      updateDrawerSaveButtonState();
+    });
+  }
+
+  function openDashboardFromDrawer(){
+    try{
+      chrome.runtime.sendMessage({action:'open_dashboard'}, ()=>{});
+    }catch(e){}
   }
 
   function showSummaryDrawer(summary, title, isPending){
@@ -199,7 +363,7 @@
       function onMove(ev){
         const x = ev.clientX;
         const delta = dragStartX - x; // moving left increases width
-        const next = Math.max(320, Math.min(720, dragStartWidth + delta));
+        const next = Math.max(320, Math.min(1440, dragStartWidth + delta));
         uiSettings.drawerWidth = next;
         drawer.style.width = `${next}px`;
       }
@@ -239,6 +403,47 @@
       hTitle.style.textOverflow = 'ellipsis';
       hTitle.style.whiteSpace = 'nowrap';
       header.appendChild(hTitle);
+
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.alignItems = 'center';
+      actions.style.gap = '8px';
+
+      const save = document.createElement('button');
+      save.id = 'gemini-drawer-save-btn';
+      save.textContent = 'Kaydet';
+      Object.assign(save.style,{
+        cursor:'pointer',
+        background:'rgba(255,255,255,.08)',
+        color:'#f5f5f5',
+        border:'1px solid rgba(255,255,255,.14)',
+        borderRadius:'8px',
+        padding:'8px 10px',
+        fontSize:'14px',
+        fontWeight:'700'
+      });
+      save.addEventListener('mouseenter', ()=>{ if(!save.disabled) save.style.background = 'rgba(255,255,255,.12)'; });
+      save.addEventListener('mouseleave', ()=>{ if(!save.disabled) save.style.background = 'rgba(255,255,255,.08)'; });
+      save.addEventListener('click', saveCurrentSummaryFromDrawer);
+      actions.appendChild(save);
+
+      const dashboard = document.createElement('button');
+      dashboard.id = 'gemini-drawer-dashboard-btn';
+      dashboard.textContent = 'Dashboard';
+      Object.assign(dashboard.style,{
+        cursor:'pointer',
+        background:'rgba(255,255,255,.08)',
+        color:'#f5f5f5',
+        border:'1px solid rgba(255,255,255,.14)',
+        borderRadius:'8px',
+        padding:'8px 10px',
+        fontSize:'14px'
+      });
+      dashboard.addEventListener('mouseenter', ()=>{ dashboard.style.background = 'rgba(255,255,255,.12)'; });
+      dashboard.addEventListener('mouseleave', ()=>{ dashboard.style.background = 'rgba(255,255,255,.08)'; });
+      dashboard.addEventListener('click', openDashboardFromDrawer);
+      actions.appendChild(dashboard);
+
       const close = document.createElement('button');
       close.textContent = 'Kapat';
       Object.assign(close.style,{
@@ -253,7 +458,8 @@
       close.addEventListener('mouseenter', ()=>{ close.style.background = 'rgba(255,255,255,.12)'; });
       close.addEventListener('mouseleave', ()=>{ close.style.background = 'rgba(255,255,255,.08)'; });
       close.addEventListener('click',()=>removeDrawer());
-      header.appendChild(close);
+      actions.appendChild(close);
+      header.appendChild(actions);
       drawer.appendChild(header);
       const content = document.createElement('div');
       content.id = 'gemini-drawer-content';
@@ -336,6 +542,7 @@
     }
     content.style.opacity = isPending ? '0.75' : '1';
     if(isPending) content.scrollTop = 0;
+    updateDrawerSaveButtonState();
   }
 
   function escapeHtml(s){
@@ -410,73 +617,170 @@
     return blocks.join('');
   }
 
-  function getAnchorTitle(a){
-    const direct = (a.getAttribute('title') || a.textContent || '').trim();
-    if(direct) return direct;
-    const card = a.closest('.yt-lockup-metadata-view-model') || a.closest('ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-rich-grid-media');
-    const titleLink = card && card.querySelector && card.querySelector('a.yt-lockup-metadata-view-model__title, a#video-title, h3 a[title]');
-    const t = titleLink && (titleLink.getAttribute('title') || titleLink.textContent);
-    return (t || document.title).trim();
+  const VIDEO_CARD_SELECTORS = [
+    'ytd-rich-item-renderer',
+    'ytd-video-renderer',
+    'ytd-grid-video-renderer',
+    'ytd-compact-video-renderer',
+    'ytd-playlist-video-renderer',
+    '.yt-lockup-view-model'
+  ].join(', ');
+
+  const VIDEO_LINK_SELECTORS = [
+    'a#thumbnail[href*="/watch"]',
+    'a#thumbnail[href*="/shorts/"]',
+    'a#thumbnail[href*="/live/"]',
+    'a#video-title[href*="/watch"]',
+    'a#video-title[href*="/shorts/"]',
+    'a#video-title-link[href*="/watch"]',
+    'a#video-title-link[href*="/shorts/"]',
+    'a.yt-lockup-metadata-view-model__title[href*="/watch"]',
+    'a.yt-lockup-metadata-view-model__title[href*="/shorts/"]',
+    'a.yt-lockup-view-model__content-image[href*="/watch"]',
+    'a.yt-lockup-view-model__content-image[href*="/shorts/"]',
+    'h3 a[href*="/watch"]',
+    'h3 a[href*="/shorts/"]'
+  ].join(', ');
+
+  const BUTTON_HOST_SELECTORS = [
+    'ytd-thumbnail',
+    '.yt-lockup-view-model-wiz__content-image',
+    '.yt-lockup-view-model__content-image'
+  ].join(', ');
+
+  function findVideoAnchorInCard(card){
+    if(!card || !card.querySelector) return null;
+    return card.querySelector(VIDEO_LINK_SELECTORS);
   }
 
-  const processedThumbs = new WeakSet();
+  function getCardTitle(card){
+    if(!card || !card.querySelector) return document.title.trim();
+    const titleLink = card.querySelector(
+      'a#video-title[title], a#video-title-link[title], a.yt-lockup-metadata-view-model__title[title], h3 a[title], #video-title, #video-title-link'
+    );
+    const text = titleLink && (titleLink.getAttribute('title') || titleLink.textContent || titleLink.getAttribute('aria-label'));
+    return String(text || '').replace(/\s+/g, ' ').trim() || document.title.trim();
+  }
 
-  function addButtonToThumbnailAnchor(a){
+  function resolveSummaryTargetFromCard(card){
+    const anchor = findVideoAnchorInCard(card);
+    const href = anchor && anchor.getAttribute ? (anchor.getAttribute('href') || '').trim() : '';
+    const url = normalizeVideoUrl(toAbsoluteUrl(href));
+    return { url: url || '', title: getCardTitle(card) };
+  }
+
+  function getButtonHostInCard(card){
+    if(!card || !card.querySelector) return card;
+    return card.querySelector(BUTTON_HOST_SELECTORS) || null;
+  }
+
+  function getCardChannelName(card){
+    if(!card || !card.querySelector) return '';
+    const channelNode = card.querySelector(
+      'ytd-channel-name a, ytd-channel-name yt-formatted-string, #channel-name a, #channel-name yt-formatted-string, a.yt-lockup-metadata-view-model__metadata'
+    );
+    return String((channelNode && (channelNode.getAttribute?.('title') || channelNode.textContent)) || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function addButtonToVideoCard(card){
     try{
-      if(!a || processedThumbs.has(a)) return;
-      const href = a.getAttribute('href') || '';
-      if(!href.includes('/watch')) return;
-      const videoUrl = toAbsoluteUrl(href);
-      if(!videoUrl) return;
+      if(!card || !card.querySelector) return;
+      if(card.querySelector('.gemini-summary-card-btn')) return;
 
-      processedThumbs.add(a);
+      const anchor = findVideoAnchorInCard(card);
+      if(!anchor) return;
+      const href = anchor.getAttribute ? (anchor.getAttribute('href') || '').trim() : '';
+      const absHref = toAbsoluteUrl(href);
+      if(!getVideoIdFromUrl(absHref)) return;
+
       ensureStyles();
 
-      a.classList.add('gemini-summary-btn-wrap');
-      // Don't clobber existing positioning if set
-      const computed = getComputedStyle(a);
-      if(computed.position === 'static') a.style.position = 'relative';
+      card.classList.add('gemini-summary-card');
+      if(getComputedStyle(card).position === 'static') card.style.position = 'relative';
+
+      const host = getButtonHostInCard(card);
+      if(!host) return;
+      if(host.querySelector('.gemini-summary-card-btn')) return;
+      host.classList.add('gemini-summary-btn-host');
+      if(getComputedStyle(host).position === 'static') host.style.position = 'relative';
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'gemini-summary-hover-btn';
+      btn.className = 'gemini-summary-card-btn';
       btn.textContent = 'Özetle';
       btn.setAttribute('aria-label', 'Gemini ile özetle');
 
       btn.addEventListener('click', (e)=>{
         e.preventDefault();
         e.stopPropagation();
-        const title = getAnchorTitle(a);
-        requestSummaryByUrl(videoUrl, title);
+        e.stopImmediatePropagation();
+        const target = resolveSummaryTargetFromCard(card);
+        const targetChannel = getCardChannelName(card);
+        requestSummaryByUrl(target.url, target.title, targetChannel);
       }, {capture:true});
 
-      a.appendChild(btn);
+      host.appendChild(btn);
     }catch(e){
       // ignore
     }
   }
 
-  function scanSubscriptions(){
-    if(!isSubscriptionsPage()) return;
+  function scanVideoCards(){
+    // Remove legacy buttons from older builds to avoid duplicate UI after extension reload.
+    document.querySelectorAll('.gemini-summary-hover-btn').forEach((oldBtn)=>{
+      try{ oldBtn.remove(); }catch(e){}
+    });
 
-    // Prefer thumbnail anchors; fallback to title anchors.
-    const anchors = document.querySelectorAll('a#thumbnail[href*="/watch"], a.yt-lockup-metadata-view-model__title[href*="/watch"], a[href^="/watch"]');
-    anchors.forEach(a=>addButtonToThumbnailAnchor(a));
+    // Defensive cleanup: keep only one card button per valid host and remove orphaned leftovers.
+    const hostToButton = new Map();
+    document.querySelectorAll('.gemini-summary-card-btn').forEach((btn)=>{
+      try{
+        const host = btn.parentElement;
+        if(!host || !host.closest(VIDEO_CARD_SELECTORS) || !host.matches(BUTTON_HOST_SELECTORS)){
+          btn.remove();
+          return;
+        }
+        if(hostToButton.has(host)){
+          btn.remove();
+          return;
+        }
+        hostToButton.set(host, btn);
+      }catch(e){}
+    });
+
+    const cards = document.querySelectorAll(VIDEO_CARD_SELECTORS);
+    const seenHosts = new Set();
+    cards.forEach((card)=>{
+      const host = getButtonHostInCard(card);
+      if(!host || seenHosts.has(host)) return;
+      seenHosts.add(host);
+      addButtonToVideoCard(card);
+    });
   }
 
-  // Observe DOM on subscriptions page (infinite scroll)
   let scanTimer = null;
-  const subsObs = new MutationObserver(()=>{
-    if(!isSubscriptionsPage()) return;
+  function scheduleVideoCardScan(){
     if(scanTimer) return;
     scanTimer = setTimeout(()=>{
       scanTimer = null;
-      scanSubscriptions();
-    }, 250);
+      scanVideoCards();
+    }, 220);
+  }
+
+  // Observe DOM everywhere (home, subscriptions, search, channel, sidebar, etc.)
+  const cardObserver = new MutationObserver(()=>{
+    scheduleVideoCardScan();
   });
-  subsObs.observe(document.documentElement || document.body, {subtree:true, childList:true});
-  // initial
-  scanSubscriptions();
+  cardObserver.observe(document.documentElement || document.body, {subtree:true, childList:true});
+
+  // YouTube SPA navigations can replace content without full page reload.
+  window.addEventListener('yt-navigate-finish', scheduleVideoCardScan, true);
+  window.addEventListener('yt-page-data-updated', scheduleVideoCardScan, true);
+
+  // initial scan
+  scanVideoCards();
 
   function parseVTT(vtt){
     return String(vtt)
@@ -505,9 +809,25 @@
   }
 
   function getVideoIdFromUrl(url){
+    if(self.GSVideoId && typeof self.GSVideoId.getVideoIdFromUrl === 'function'){
+      return self.GSVideoId.getVideoIdFromUrl(url);
+    }
     try{
       const u = new URL(url, location.origin);
-      return u.searchParams.get('v');
+      const direct = (u.searchParams.get('v') || '').trim();
+      if(direct) return direct;
+
+      const host = String(u.hostname || '').toLowerCase();
+      if(host === 'youtu.be'){
+        const parts = String(u.pathname || '').split('/').filter(Boolean);
+        return parts[0] || null;
+      }
+
+      const segments = String(u.pathname || '').split('/').filter(Boolean);
+      const markerIndex = segments.findIndex((seg)=> seg === 'shorts' || seg === 'live' || seg === 'embed');
+      if(markerIndex >= 0 && segments[markerIndex + 1]) return segments[markerIndex + 1];
+
+      return null;
     }catch(e){
       return null;
     }
@@ -595,11 +915,47 @@
     return (desc && desc.innerText ? desc.innerText.trim() : '');
   }
 
+  function getUploadDateFromPage(){
+    try{
+      const ipr = window.ytInitialPlayerResponse;
+      const micro = ipr && ipr.microformat && ipr.microformat.playerMicroformatRenderer;
+      const candidate = micro && (micro.uploadDate || micro.publishDate);
+      const normalized = normalizeUploadDate(candidate);
+      if(normalized) return normalized;
+    }catch(e){}
+
+    const meta = document.querySelector('meta[itemprop="datePublished"], meta[property="video:release_date"], meta[name="date"]');
+    return normalizeUploadDate(meta && meta.getAttribute ? meta.getAttribute('content') : '');
+  }
+
+  function getChannelNameFromPage(){
+    const node =
+      document.querySelector('ytd-video-owner-renderer #channel-name a') ||
+      document.querySelector('ytd-video-owner-renderer #channel-name yt-formatted-string') ||
+      document.querySelector('ytd-channel-name a') ||
+      document.querySelector('ytd-channel-name yt-formatted-string') ||
+      document.querySelector('#upload-info ytd-channel-name a') ||
+      null;
+    return String((node && (node.getAttribute?.('title') || node.textContent)) || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function isLikelyErrorSummary(text){
+    const t = String(text || '').toLowerCase();
+    if(!t) return true;
+    return (
+      t.includes('özetleme isteği başarısız') ||
+      t.includes('ozetleme istegi basarisiz') ||
+      t.includes('api key') ||
+      t.includes('zaman asimina ugradi') ||
+      t.includes('hata')
+    );
+  }
+
   async function getVideoContext(){
     const url = location.href;
     const videoId = getVideoIdFromUrl(url);
     if(!videoId){
-      return { ok:false, error:'Bu sayfa bir YouTube video sayfası değil. Bir video açın (URL içinde ?v=...).', url };
+      return { ok:false, error:'Bu sayfa bir YouTube video sayfasi degil. Bir video (watch/shorts/live) acip tekrar deneyin.', url };
     }
 
     const title = getTitle();
@@ -614,6 +970,8 @@
       url,
       videoId,
       title,
+      channelName: getChannelNameFromPage(),
+      uploadDate: getUploadDateFromPage(),
       description,
       transcript
     };
@@ -625,8 +983,38 @@
         sendResponse({ok:true, ignored:true});
         return;
       }
+      setSummaryPending(false);
+      const resolvedUrl = String((msg && msg.videoUrl) || (pendingSummarySource && pendingSummarySource.url) || location.href || '').trim();
+      const resolvedVideoId = (msg && msg.videoId) || (pendingSummarySource && pendingSummarySource.videoId) || getVideoIdFromUrl(resolvedUrl);
+      const resolvedTitle = String((msg && msg.title) || (pendingSummarySource && pendingSummarySource.title) || getTitle() || document.title || '').trim();
+      const resolvedChannel = String((msg && msg.channelName) || (pendingSummarySource && pendingSummarySource.channelName) || getChannelNameFromPage() || '').trim();
+      const resolvedUploadDate = normalizeUploadDate((msg && msg.uploadDate) || (pendingSummarySource && pendingSummarySource.uploadDate) || getUploadDateFromPage() || '');
+      const resolvedSummary = String(msg.summary || '').trim();
+
+      if(!isLikelyErrorSummary(resolvedSummary)){
+        latestSummaryContext = {
+          summary: resolvedSummary,
+          title: resolvedTitle,
+          channelName: resolvedChannel,
+          videoUrl: normalizeVideoUrl(resolvedUrl),
+          videoId: resolvedVideoId || null,
+          uploadDate: resolvedUploadDate || '',
+          capturedAt: new Date().toISOString()
+        };
+      }
+
       showSummaryDrawer(msg.summary || JSON.stringify(msg), msg.title || document.title, false);
+      pendingSummarySource = null;
       sendResponse({ok:true});
+      return;
+    }
+    if(msg && msg.action === 'get_current_summary_context'){
+      const context = latestSummaryContext && typeof latestSummaryContext === 'object' ? latestSummaryContext : null;
+      if(!context){
+        sendResponse({ok:false, error:'Kaydedilecek bir ozet bulunamadi. Once bir ozet olusturun.'});
+        return;
+      }
+      sendResponse({ok:true, context});
       return;
     }
     if(msg && msg.action === 'get_video_context'){
@@ -639,7 +1027,7 @@
           const videoId = getVideoIdFromUrl(url);
           if(!videoId){
             responded = true;
-            sendResponse({ ok:false, error:'Bu sayfa bir YouTube video sayfası değil. Bir video açın (URL içinde ?v=...).', url });
+            sendResponse({ok:false, error:'Bu sayfa bir YouTube video sayfasi degil. Bir video (watch/shorts/live) acip tekrar deneyin.', url});
             return;
           }
           const baseCtx = {
@@ -667,19 +1055,47 @@
     if(msg && msg.action === 'start_summary'){
       (async ()=>{
         try{
+          if(summaryPending){
+            showSummaryDrawer('Ozet zaten hazirlaniyor. Lutfen bekleyin.', 'Gemini ile ozetle', true);
+            sendResponse({ok:true, deduped:true});
+            return;
+          }
+          setSummaryPending(true);
           showSummaryDrawer('Video bilgileri alınıyor...', 'Gemini ile özetle', true);
           const ctx = await getVideoContext();
           if(!ctx.ok){
+            setSummaryPending(false);
             showSummaryDrawer(ctx.error || 'Video bilgisi alınamadı.', 'Hata', false);
             sendResponse({ok:false, error: ctx.error});
             return;
           }
           const requestId = newRequestId();
           activeRequestId = requestId;
+          pendingSummarySource = {
+            requestId,
+            source: 'page',
+            url: ctx.url,
+            videoId: ctx.videoId,
+            title: ctx.title,
+            channelName: ctx.channelName || '',
+            uploadDate: ctx.uploadDate || ''
+          };
           showSummaryDrawer('Özet hazırlanıyor...', ctx.title, true);
-          chrome.runtime.sendMessage({action:'summarize_content', context: ctx, requestId}, ()=>{});
+          chrome.runtime.sendMessage({action:'summarize_content', context: ctx, requestId}, (resp)=>{
+            const runtimeError = chrome.runtime.lastError;
+            if(runtimeError){
+              setSummaryPending(false);
+              showSummaryDrawer(runtimeError.message || 'Arka plan iletisi başarısız oldu.', 'Hata', false);
+              return;
+            }
+            if(resp && resp.ok === false){
+              setSummaryPending(false);
+              showSummaryDrawer(resp.error || 'Özetleme isteği başarısız oldu.', 'Hata', false);
+            }
+          });
           sendResponse({ok:true});
         } catch (e){
+          setSummaryPending(false);
           showSummaryDrawer(String(e), 'Hata', false);
           sendResponse({ok:false, error: String(e)});
         }
@@ -689,14 +1105,40 @@
   });
 
   window.__geminiRequestSummary = async ()=>{
+    if(summaryPending){
+      showSummaryDrawer('Ozet zaten hazirlaniyor. Lutfen bekleyin.', 'Gemini ile ozetle', true);
+      return;
+    }
+    setSummaryPending(true);
     const ctx = await getVideoContext();
     if(!ctx.ok){
+      setSummaryPending(false);
       showSummaryDrawer(ctx.error || 'Video bilgisi alınamadı.', 'Hata', false);
       return;
     }
     const requestId = newRequestId();
     activeRequestId = requestId;
+    pendingSummarySource = {
+      requestId,
+      source: 'page',
+      url: ctx.url,
+      videoId: ctx.videoId,
+      title: ctx.title,
+      channelName: ctx.channelName || '',
+      uploadDate: ctx.uploadDate || ''
+    };
     showSummaryDrawer('Özet hazırlanıyor...', ctx.title, true);
-    chrome.runtime.sendMessage({action:'summarize_content', context: ctx, requestId}, ()=>{});
+    chrome.runtime.sendMessage({action:'summarize_content', context: ctx, requestId}, (resp)=>{
+      const runtimeError = chrome.runtime.lastError;
+      if(runtimeError){
+        setSummaryPending(false);
+        showSummaryDrawer(runtimeError.message || 'Arka plan iletisi başarısız oldu.', 'Hata', false);
+        return;
+      }
+      if(resp && resp.ok === false){
+        setSummaryPending(false);
+        showSummaryDrawer(resp.error || 'Özetleme isteği başarısız oldu.', 'Hata', false);
+      }
+    });
   };
 })();

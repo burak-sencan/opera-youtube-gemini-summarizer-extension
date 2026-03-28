@@ -13,7 +13,7 @@
   "content_scripts": [
     {
       "matches": ["*://www.youtube.com/*"],
-      "js": ["content_script.js"]
+      "js": ["lib/shared/video_id.js", "content_script.js"]
     }
   ],
   "options_page": "options.html",

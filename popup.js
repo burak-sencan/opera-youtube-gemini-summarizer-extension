@@ -1,34 +1,50 @@
-document.getElementById('summarize').addEventListener('click', ()=>{
-  chrome.tabs.query({active:true,currentWindow:true}, tabs=>{
-    if(!tabs || !tabs[0]) return;
-    const tabId = tabs[0].id;
-    const msgEl = document.getElementById('msg');
-    msgEl.textContent = 'Özet başlatılıyor...';
+const msgEl = document.getElementById('msg');
 
-    let didFinish = false;
-    const t = setTimeout(()=>{
-      if(didFinish) return;
-      msgEl.textContent = 'Video bilgileri alınamadı. YouTube video sayfasını (watch) açıp tekrar deneyin.';
-    }, 3000);
+function setMsg(text){
+  msgEl.textContent = String(text || '');
+}
 
-    // Prefer: let content script run the full flow (shows drawer + triggers background)
-    chrome.tabs.sendMessage(tabId, {action:'start_summary'}, (resp)=>{
-      didFinish = true;
-      clearTimeout(t);
-      const lastErr = chrome.runtime.lastError;
-      if(lastErr){
-        msgEl.textContent = 'Bu sayfada çalışamadım. YouTube video sayfasını açıp tekrar deneyin.';
-        return;
-      }
-      if(resp && resp.ok){
-        msgEl.textContent = 'İstek gönderildi. Sonuç sayfada sağdan açılacak.';
-      } else {
-        msgEl.textContent = (resp && resp.error) ? resp.error : 'Özet başlatılamadı.';
-      }
+function getActiveTab(){
+  return new Promise((resolve)=>{
+    chrome.tabs.query({active:true,currentWindow:true}, (tabs)=>{
+      resolve((tabs && tabs[0]) ? tabs[0] : null);
     });
   });
-});
+}
 
-document.getElementById('openOptions').addEventListener('click', ()=>{
+function sendMessageToTab(tabId, payload){
+  return new Promise((resolve)=>{
+    chrome.tabs.sendMessage(tabId, payload, (resp)=>{
+      const lastErr = chrome.runtime.lastError;
+      if(lastErr){
+        resolve({ok:false, error:lastErr.message || 'Tab ile iletisim hatasi'});
+        return;
+      }
+      resolve(resp || {ok:false, error:'Bos yanit'});
+    });
+  });
+}
+
+async function handleSummarize(){
+  const tab = await getActiveTab();
+  if(!tab || typeof tab.id !== 'number'){
+    setMsg('Aktif sekme bulunamadi.');
+    return;
+  }
+
+  setMsg('Özet başlatılıyor...');
+  const resp = await sendMessageToTab(tab.id, {action:'start_summary'});
+  if(resp && resp.ok){
+    setMsg('İstek gönderildi. Sonuç sayfada sağdan açılacak.');
+    return;
+  }
+
+  setMsg((resp && resp.error) ? resp.error : 'Özet başlatılamadı.');
+}
+
+function handleOpenOptions(){
   chrome.runtime.openOptionsPage();
-});
+}
+
+document.getElementById('summarize').addEventListener('click', handleSummarize);
+document.getElementById('openOptions').addEventListener('click', handleOpenOptions);

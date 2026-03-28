@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     apikey.value = cfg.apiKey || '';
     model.value = cfg.apiModel || '';
     language.value = cfg.language || 'Türkçe';
-    summaryFormat.value = cfg.summaryFormat || 'tldr_bullets';
+    summaryFormat.value = cfg.summaryFormat || 'simple';
     drawerFontSize.value = cfg.drawerFontSize || 15;
     drawerWidth.value = cfg.drawerWidth || 440;
 
@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   document.getElementById('save').addEventListener('click', ()=>{
     const fontSizeNum = Math.max(12, Math.min(22, parseInt(drawerFontSize.value || '15', 10) || 15));
-    const widthNum = Math.max(320, Math.min(720, parseInt(drawerWidth.value || '440', 10) || 440));
+    const widthNum = Math.max(320, Math.min(1440, parseInt(drawerWidth.value || '440', 10) || 440));
     chrome.storage.local.set({
       apiKey: apikey.value.trim(),
       apiModel: (model && model.value ? model.value.trim() : ''),

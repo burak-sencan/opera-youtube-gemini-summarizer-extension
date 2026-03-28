@@ -31,13 +31,15 @@ Not: Kodda değişiklik yaptıktan sonra uzantılar sayfasında **Reload** ile y
 - İsterseniz Ayarlar ekranında listeden bir modeli manuel seçebilirsiniz.
 
 ### Kullanım
-- YouTube'da bir video açın (URL'de `watch?v=...` olmalı).
+- YouTube'da bir video açın (watch, shorts veya live sayfası olabilir).
 - Uzantı ikonuna tıklayın ve "Videoyu Gemini ile Özetle" düğmesine basın.
 - Sonuç, sayfada sağdan açılan panelde (drawer) gösterilir.
 - Drawer dışına tıklarsanız panel kapanır (Kapat butonu da vardır).
 
-### Abonelikler sayfası
-- `https://www.youtube.com/feed/subscriptions` sayfasında video küçük resminin üstüne gelince üst-ortada "Özetle" butonu çıkar; tek tıkla özet alabilirsiniz.
+### Video kartları (YouTube geneli)
+- YouTube ana sayfa, abonelikler, arama, kanal listeleri gibi video kartı olan sayfalarda kartın üzerinde "Özetle" butonu görünür.
+- Buton kart üzerinde sağ üstte konumlanır ve tek tıkla özet başlatır.
+- Buton `watch`, `shorts` ve `live` video bağlantılarını destekler.
 
 ### Notlar
 - Güvenlik: API anahtarını uzantıda saklamak kolaydır ama daha az güvenlidir.
@@ -91,13 +93,15 @@ Note: After making code changes, go to the extensions page and click **Reload**.
 - Optional: pick a model manually from the Settings list.
 
 ### Usage
-- Open a YouTube video page (URL must include `watch?v=...`).
+- Open any YouTube video page (watch, shorts, or live).
 - Click the extension icon and press “Summarize with Gemini”.
 - The summary is shown in a right-side drawer.
 - Clicking outside the drawer closes it.
 
-### Subscriptions page
-- On `https://www.youtube.com/feed/subscriptions`, hover a thumbnail to see a top-centered “Summarize” button.
+### Video cards across YouTube
+- On pages with video cards (Home, Subscriptions, Search, many Channel lists), a “Summarize” button is shown on each supported card.
+- The button is placed near the top-right area of the card and starts summarization in one click.
+- It supports `watch`, `shorts`, and `live` links.
 
 ### Notes
 - Security: storing an API key in an extension is convenient but less secure.

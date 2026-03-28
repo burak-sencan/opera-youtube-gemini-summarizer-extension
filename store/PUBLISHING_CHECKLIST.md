@@ -16,7 +16,7 @@
 
 ## Test
 - [ ] YouTube watch sayfasında özet alma
-- [ ] Abonelikler sayfasında hover “Özetle” butonu
+- [ ] Video kartı olan sayfalarda (ana sayfa/abonelikler/arama/kanal listeleri) “Özetle” butonu görünmesi
 - [ ] Drawer dışına tıklayınca kapanma
 - [ ] Rate limit durumunda başka modele geçiş
 

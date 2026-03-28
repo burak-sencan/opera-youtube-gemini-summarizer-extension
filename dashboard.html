@@ -1,0 +1,445 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Analiz Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f1115;
+      --panel:#151922;
+      --panel-2:#1b2230;
+      --panel-3:#111825;
+      --text:#e7ebf2;
+      --muted:#aab4c5;
+      --border:#2a3344;
+      --accent:#3d8bfd;
+      --accent-2:#7fb0ff;
+      --danger:#e66060;
+      --ok:#53b57f;
+    }
+
+    *{ box-sizing:border-box; }
+
+    html, body{ height:100%; }
+
+    body{
+      margin:0;
+      background: radial-gradient(1400px 420px at 8% -15%, #24345b 0%, rgba(36,52,91,0) 58%), var(--bg);
+      color:var(--text);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      overflow:hidden;
+    }
+
+    .app{
+      height:100vh;
+      width:100%;
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:14px 16px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background: rgba(17,22,31,.92);
+      backdrop-filter: blur(6px);
+      flex:0 0 auto;
+    }
+
+    .title-wrap h1{ margin:0; font-size:20px; letter-spacing:.2px; }
+    .title-wrap p{ margin:4px 0 0 0; color:var(--muted); font-size:12px; }
+
+    .tab-row{ display:flex; gap:8px; }
+
+    .tab-btn{
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      border-radius:10px;
+      padding:9px 14px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+    }
+
+    .tab-btn.active{ background:var(--accent); border-color:var(--accent); }
+
+    .panel{
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:var(--panel);
+      padding:12px;
+      flex:1;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .records-layout,
+    .analysis-layout{
+      height:100%;
+      min-height:0;
+      display:grid;
+      gap:12px;
+    }
+
+    .records-layout{ grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); }
+    .analysis-layout{ grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+
+    .col{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .toolbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+      flex:0 0 auto;
+    }
+
+    .toolbar-group{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      width:100%;
+    }
+
+    input[type="text"], textarea, select{
+      width:100%;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--text);
+      border-radius:10px;
+      padding:10px;
+      font-size:13px;
+    }
+
+    textarea{ min-height:150px; resize:vertical; }
+
+    #editSummary{ min-height:240px; }
+    #analysisPrompt{ min-height:120px; }
+
+    #analysisPayload,
+    #analysisResult{
+      min-height:220px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .btn{
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--text);
+      border-radius:10px;
+      padding:8px 12px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:12px;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+    }
+
+    .btn:hover{ border-color:#4a5a78; }
+    .btn.primary{ background:var(--accent); border-color:var(--accent); color:white; }
+    .btn.danger{ background:rgba(230,96,96,.15); border-color:rgba(230,96,96,.45); color:#ffd5d5; }
+
+    .records-table-wrap{
+      min-height:0;
+      flex:1;
+      border:1px solid var(--border);
+      border-radius:10px;
+      overflow:auto;
+      background:var(--panel-3);
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:12px;
+      min-width:1080px;
+    }
+
+    th, td{
+      border-bottom:1px solid #223044;
+      text-align:left;
+      vertical-align:top;
+      padding:9px;
+    }
+
+    th{
+      color:var(--muted);
+      font-size:11px;
+      font-weight:700;
+      background:rgba(20,28,41,.96);
+      position:sticky;
+      top:0;
+      z-index:2;
+    }
+
+    tr.active-row{ background:rgba(61,139,253,.15); }
+
+    .title-cell{
+      min-width:220px;
+      font-weight:700;
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    .summary-snippet{
+      min-width:360px;
+      max-width:520px;
+      white-space:normal;
+      line-height:1.45;
+      color:#d8deea;
+      font-size:13px;
+      display:-webkit-box;
+      -webkit-line-clamp:4;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+
+    .meta-stack{ font-size:12px; color:var(--muted); line-height:1.4; }
+    .muted{ color:var(--muted); font-size:12px; }
+    .hidden{ display:none !important; }
+
+    .selected-list{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px;
+      background:var(--panel-2);
+      min-height:0;
+      flex:1;
+      overflow:auto;
+    }
+
+    .record-chip{
+      border:1px solid #2f3c52;
+      border-radius:10px;
+      padding:10px;
+      margin-bottom:8px;
+      background:#172131;
+    }
+
+    .record-chip-title{
+      font-weight:700;
+      margin-bottom:4px;
+      font-size:13px;
+    }
+
+    .record-chip-summary{
+      margin-top:6px;
+      color:#cfdaed;
+      font-size:12px;
+      line-height:1.45;
+      display:-webkit-box;
+      -webkit-line-clamp:3;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+
+    .status{
+      margin-top:4px;
+      font-size:12px;
+      color:var(--muted);
+      min-height:18px;
+    }
+
+    .metrics{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px;
+      background:rgba(255,255,255,.02);
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+      flex:0 0 auto;
+    }
+
+    .mode-bar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-bottom:8px;
+    }
+
+    .mode-btn{
+      border:1px solid #3a4a66;
+      background:#172133;
+      color:#dce5f6;
+      border-radius:999px;
+      padding:6px 11px;
+      font-size:12px;
+      cursor:pointer;
+      font-weight:700;
+    }
+
+    .mode-btn.active{
+      background:#244a8d;
+      border-color:#3875d6;
+      color:#fff;
+    }
+
+    .analysis-right,
+    .analysis-left{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .analysis-stack{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      flex:1;
+      overflow:auto;
+      padding-right:2px;
+    }
+
+    @media (max-width: 1260px){
+      .records-layout,
+      .analysis-layout{ grid-template-columns:1fr; }
+
+      .summary-snippet{ min-width:320px; }
+
+      #editSummary,
+      #analysisPayload,
+      #analysisResult{ min-height:180px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title-wrap">
+        <h1>Analiz Dashboard</h1>
+        <p>Kayıtları seç, mod belirle, Gemini ile toplu analiz al.</p>
+      </div>
+      <div class="tab-row">
+        <button class="tab-btn active" id="tabRecordsBtn" data-tab="records">Kayıtlar</button>
+        <button class="tab-btn" id="tabAnalysisBtn" data-tab="analysis">Analiz</button>
+      </div>
+    </div>
+
+    <section id="recordsTab" class="panel">
+      <div class="records-layout">
+        <div class="col">
+          <div class="toolbar">
+            <input id="searchInput" type="text" placeholder="Başlık, kanal, özet, URL içinde ara..." style="flex:1 1 260px" />
+            <div class="toolbar-group">
+              <button class="btn" id="refreshBtn">Yenile</button>
+              <button class="btn" id="selectVisibleBtn">Filtredekileri Seç</button>
+              <button class="btn" id="clearVisibleBtn">Filtre Seçimini Temizle</button>
+              <button class="btn" id="exportSelectedBtn">Seçileni Dışa Aktar</button>
+              <button class="btn" id="exportAllBtn">Tümünü Dışa Aktar</button>
+              <button class="btn" id="importBtn">İçe Aktar</button>
+              <button class="btn danger" id="deleteSelectedBtn">Seçiliyi Sil</button>
+              <input id="importFileInput" type="file" accept="application/json" class="hidden" />
+            </div>
+          </div>
+
+          <div class="records-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:42px;">Seç</th>
+                  <th>Başlık</th>
+                  <th>Özet Önizleme</th>
+                  <th style="width:170px;">Kanal</th>
+                  <th style="width:120px;">Video Tarihi</th>
+                  <th style="width:150px;">Kayıt Tarihi</th>
+                  <th style="width:160px;">İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTbody"></tbody>
+            </table>
+          </div>
+          <div class="status" id="recordsStatus"></div>
+        </div>
+
+        <div class="col">
+          <h3 style="margin:2px 0 8px 0;">Kayıt Düzenle</h3>
+          <div class="muted" style="margin-bottom:4px;">Satıra tıklayıp içeriği düzenleyebilirsiniz.</div>
+          <div style="display:grid; gap:8px; min-height:0; flex:1;">
+            <input id="editTitle" type="text" placeholder="Başlık" />
+            <input id="editChannel" type="text" placeholder="Kanal adı" />
+            <input id="editVideoUrl" type="text" placeholder="Video URL" />
+            <input id="editUploadDate" type="text" placeholder="Video yüklenme tarihi (YYYY-AA-GG)" />
+            <textarea id="editSummary" placeholder="Özet içeriği"></textarea>
+            <div style="display:flex; gap:8px;">
+              <button class="btn primary" id="saveEditBtn">Kaydı Güncelle</button>
+              <button class="btn danger" id="deleteActiveBtn">Kaydı Sil</button>
+            </div>
+          </div>
+          <div class="status" id="editStatus"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="analysisTab" class="panel hidden">
+      <div class="analysis-layout">
+        <div class="analysis-left">
+          <h3 style="margin:2px 0 8px 0;">Analize Dahil Edilen Kayıtlar</h3>
+          <div class="muted" style="margin-bottom:4px;">Kayıtlar sekmesinde seçtiğiniz kayıtlar burada görünür.</div>
+          <div class="selected-list" id="selectedList"></div>
+          <div class="status" id="analysisSelectionStatus"></div>
+        </div>
+
+        <div class="analysis-right">
+          <h3 style="margin:2px 0 8px 0;">Gemini Analiz</h3>
+          <div class="muted" style="margin-bottom:2px;">Hazır mod seçebilir veya prompt alanını tamamen özelleştirebilirsiniz.</div>
+          <div class="analysis-stack">
+            <div id="analysisMetrics" class="metrics">Seçili kayıt yok.</div>
+
+            <div>
+              <div class="mode-bar">
+                <button class="mode-btn" data-mode="idea_timeline">Fikir Evrimi</button>
+                <button class="mode-btn" data-mode="consistency_map">Tutarlılık Haritası</button>
+                <button class="mode-btn" data-mode="argument_shift">Argüman Dönüşümü</button>
+                <button class="mode-btn" data-mode="risk_opportunity">Risk ve Fırsat</button>
+                <button class="mode-btn" data-mode="custom">Özel Mod</button>
+              </div>
+              <textarea id="analysisPrompt" placeholder="Analiz talebinizi yazın. Mod butonları örnek promptları otomatik doldurur."></textarea>
+            </div>
+
+            <textarea id="analysisPayload" readonly placeholder="Seçili kayıtlar ve prompt ile oluşturulan veri paketi burada görünür."></textarea>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn primary" id="runAnalysisBtn">Gemini ile Analiz Et</button>
+              <button class="btn" id="copyPayloadBtn">Veri Paketini Kopyala</button>
+              <button class="btn" id="downloadPayloadBtn">Payload JSON İndir</button>
+              <button class="btn" id="clearSelectionBtn">Seçimi Temizle</button>
+            </div>
+
+            <textarea id="analysisResult" readonly placeholder="Gemini analizi burada görünecek."></textarea>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn" id="copyResultBtn">Analiz Sonucunu Kopyala</button>
+              <button class="btn" id="clearResultBtn">Sonucu Temizle</button>
+            </div>
+          </div>
+          <div class="status" id="analysisStatus"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
