@@ -15,6 +15,7 @@
   const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
   const recordsTbody = document.getElementById('recordsTbody');
   const recordsStatus = document.getElementById('recordsStatus');
+  const recordsMeta = document.getElementById('recordsMeta');
 
   const editTitle = document.getElementById('editTitle');
   const editChannel = document.getElementById('editChannel');
@@ -34,49 +35,53 @@
   const downloadPayloadBtn = document.getElementById('downloadPayloadBtn');
   const clearSelectionBtn = document.getElementById('clearSelectionBtn');
   const analysisResult = document.getElementById('analysisResult');
+  const analysisResultRendered = document.getElementById('analysisResultRendered');
   const copyResultBtn = document.getElementById('copyResultBtn');
   const clearResultBtn = document.getElementById('clearResultBtn');
+  const resultViewRenderedBtn = document.getElementById('resultViewRenderedBtn');
+  const resultViewRawBtn = document.getElementById('resultViewRawBtn');
   const analysisStatus = document.getElementById('analysisStatus');
   const analysisSelectionStatus = document.getElementById('analysisSelectionStatus');
 
   const modeButtons = Array.from(document.querySelectorAll('.mode-btn[data-mode]'));
+  const collapseButtons = Array.from(document.querySelectorAll('.collapse-btn[data-body-id]'));
 
   const ANALYSIS_MODE_PRESETS = {
     idea_timeline: {
       title: 'Fikir Evrimi',
       prompt: [
-        'Seçili kayıtları tarih sırasına göre incele.',
-        'Aynı konuya yaklaşımın zamanla nasıl değiştiğini ortaya koy.',
-        'İlk dönem ile son dönem görüşleri arasındaki farkı net karşılaştır.',
-        'Her kritik değişim için ilgili video başlıklarıyla kısa kanıt ekle.'
+        'Secili kayitlari tarih sirasina gore incele.',
+        'Ayni konuya yaklasimin zamanla nasil degistigini ortaya koy.',
+        'Ilk donem ile son donem gorusleri arasindaki farki net karsilastir.',
+        'Her kritik degisim icin ilgili video basliklariyla kisa kanit ekle.'
       ].join(' ')
     },
     consistency_map: {
-      title: 'Tutarlılık Haritası',
+      title: 'Tutarlilik Haritasi',
       prompt: [
-        'Seçili kayıtlar içinde birbirini destekleyen ve çelişen ifadeleri çıkar.',
-        'Konu bazlı tutarlılık puanı ve kısa gerekçe ver.',
-        'Varsa belirgin çelişkileri madde madde yaz ve olası nedenleri belirt.'
+        'Secili kayitlar icinde birbirini destekleyen ve celisen ifadeleri cikar.',
+        'Konu bazli tutarlilik puani ve kisa gerekce ver.',
+        'Varsa belirgin celiskileri madde madde yaz ve olasi nedenleri belirt.'
       ].join(' ')
     },
     argument_shift: {
-      title: 'Argüman Dönüşümü',
+      title: 'Arguman Donusumu',
       prompt: [
-        'Konuşmacının ana argümanını dönemlere ayır.',
-        'Hangi dönemlerde hangi gerekçelere yaslandığını göster.',
-        'Dönüşüm noktalarını ve bunların olası tetikleyicilerini çıkar.'
+        'Konusmacinin ana argumanini donemlere ayir.',
+        'Hangi donemlerde hangi gerekcelere yaslandigini goster.',
+        'Donusum noktalarini ve bunlarin olasi tetikleyicilerini cikar.'
       ].join(' ')
     },
     risk_opportunity: {
-      title: 'Risk ve Fırsat',
+      title: 'Risk ve Firsat',
       prompt: [
-        'Kayıtlardan çıkan riskleri ve fırsatları ayrı başlıklarda topla.',
-        'Etkisi yüksek maddeleri öncelik sırasına göre ver.',
-        'Her madde için kısa uygulanabilir öneri ekle.'
+        'Kayitlardan cikan riskleri ve firsatlari ayri basliklarda topla.',
+        'Etkisi yuksek maddeleri oncelik sirasina gore ver.',
+        'Her madde icin kisa uygulanabilir oneri ekle.'
       ].join(' ')
     },
     custom: {
-      title: 'Özel Mod',
+      title: 'Ozel Mod',
       prompt: ''
     }
   };
@@ -88,7 +93,12 @@
     activeId: null,
     tab: 'records',
     analysisMode: 'idea_timeline',
-    analysisBusy: false
+    analysisBusy: false,
+    resultView: 'rendered',
+    collapsedBodies: {
+      modePromptBody: false,
+      payloadBody: false
+    }
   };
 
   function setStatus(el, text){
@@ -137,11 +147,84 @@
       .replace(/'/g, '&#39;');
   }
 
+  function renderInlineMarkdown(text){
+    let v = esc(text);
+
+    v = v.replace(/`([^`]+)`/g, '<code>$1</code>');
+    v = v.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    v = v.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    v = v.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    return v;
+  }
+
+  function renderMarkdownToHtml(markdownText){
+    const input = String(markdownText || '').replace(/\r\n/g, '\n').trim();
+    if(!input) return '<p class="muted">Henuz analiz sonucu yok.</p>';
+
+    const lines = input.split('\n');
+    const out = [];
+    let inUl = false;
+    let inOl = false;
+
+    const closeLists = ()=>{
+      if(inUl){ out.push('</ul>'); inUl = false; }
+      if(inOl){ out.push('</ol>'); inOl = false; }
+    };
+
+    for(const rawLine of lines){
+      const line = String(rawLine || '');
+      const t = line.trim();
+
+      if(!t){
+        closeLists();
+        continue;
+      }
+
+      const h = t.match(/^(#{1,4})\s+(.+)$/);
+      if(h){
+        closeLists();
+        const level = Math.min(4, h[1].length);
+        out.push(`<h${level}>${renderInlineMarkdown(h[2])}</h${level}>`);
+        continue;
+      }
+
+      const ul = t.match(/^[-*]\s+(.+)$/);
+      if(ul){
+        if(inOl){ out.push('</ol>'); inOl = false; }
+        if(!inUl){ out.push('<ul>'); inUl = true; }
+        out.push(`<li>${renderInlineMarkdown(ul[1])}</li>`);
+        continue;
+      }
+
+      const ol = t.match(/^\d+\.\s+(.+)$/);
+      if(ol){
+        if(inUl){ out.push('</ul>'); inUl = false; }
+        if(!inOl){ out.push('<ol>'); inOl = true; }
+        out.push(`<li>${renderInlineMarkdown(ol[1])}</li>`);
+        continue;
+      }
+
+      closeLists();
+      out.push(`<p>${renderInlineMarkdown(t)}</p>`);
+    }
+
+    closeLists();
+    return out.join('');
+  }
+
   function summarizeText(value, limit){
     const text = String(value || '').replace(/\s+/g, ' ').trim();
     if(!text) return '-';
     if(text.length <= limit) return text;
     return `${text.slice(0, limit)}...`;
+  }
+
+  function updateRecordsMeta(){
+    const total = state.records.length;
+    const filtered = getFilteredRecords().length;
+    const selected = state.selectedIds.size;
+    recordsMeta.textContent = `Toplam: ${total} | Secili: ${selected} | Filtre: ${filtered}`;
   }
 
   function getFilteredRecords(){
@@ -200,7 +283,7 @@
         minUploadDate: uploadDates.length ? uploadDates[0] : '',
         maxUploadDate: uploadDates.length ? uploadDates[uploadDates.length - 1] : ''
       },
-      records: selected.map((row)=>( {
+      records: selected.map((row)=>({
         id: row.id,
         title: String(row.title || ''),
         channelName: String(row.channelName || ''),
@@ -218,6 +301,36 @@
       const mode = String(btn.dataset.mode || '').trim();
       btn.classList.toggle('active', mode === state.analysisMode);
     });
+  }
+
+  function setResultView(view){
+    const next = view === 'raw' ? 'raw' : 'rendered';
+    state.resultView = next;
+
+    const isRendered = next === 'rendered';
+    analysisResultRendered.classList.toggle('hidden', !isRendered);
+    analysisResult.classList.toggle('hidden', isRendered);
+
+    resultViewRenderedBtn.classList.toggle('active', isRendered);
+    resultViewRawBtn.classList.toggle('active', !isRendered);
+  }
+
+  function renderAnalysisResult(){
+    const text = String(analysisResult.value || '').trim();
+    analysisResultRendered.innerHTML = renderMarkdownToHtml(text);
+  }
+
+  function setSectionCollapsed(bodyId, collapsed){
+    const id = String(bodyId || '').trim();
+    const body = document.getElementById(id);
+    if(!body) return;
+
+    const isCollapsed = !!collapsed;
+    body.classList.toggle('collapsed', isCollapsed);
+    state.collapsedBodies[id] = isCollapsed;
+
+    const btn = document.querySelector(`.collapse-btn[data-body-id="${id}"]`);
+    if(btn) btn.textContent = isCollapsed ? 'Genislet' : 'Daralt';
   }
 
   function renderAnalysisDetails(){
@@ -263,6 +376,7 @@
     else state.selectedIds.delete(key);
 
     renderSelectedList();
+    updateRecordsMeta();
   }
 
   function renderRecordsTable(){
@@ -277,7 +391,7 @@
       const checked = state.selectedIds.has(id) ? 'checked' : '';
       const activeClass = state.activeId === id ? 'active-row' : '';
       const title = esc(row.title || '(basliksiz)');
-      const summary = esc(summarizeText(row.summary || '', 600));
+      const summary = esc(summarizeText(row.summary || '', 700));
       const channel = esc(row.channelName || '-');
       const uploadDate = esc(normalizeVideoDate(row.uploadDate) || '-');
       const createdAt = esc(formatDateTime(row.createdAt));
@@ -315,7 +429,7 @@
         <div class="record-chip">
           <div class="record-chip-title">${esc(row.title || '(basliksiz)')}</div>
           <div class="muted">${esc(row.channelName || '-')} | Video: ${esc(uploadDate || '-')} | Kayit: ${esc(formatDateTime(row.createdAt))}</div>
-          <div class="record-chip-summary">${esc(summarizeText(row.summary || '', 320))}</div>
+          <div class="record-chip-summary">${esc(summarizeText(row.summary || '', 440))}</div>
         </div>
       `;
     }).join('');
@@ -340,6 +454,7 @@
 
     renderRecordsTable();
     renderSelectedList();
+    updateRecordsMeta();
     setStatus(recordsStatus, `Toplam kayit: ${state.records.length}`);
 
     if(!state.activeId && state.records.length){
@@ -420,6 +535,7 @@
     });
     renderRecordsTable();
     renderSelectedList();
+    updateRecordsMeta();
     setStatus(recordsStatus, `Filtredeki kayitlar secildi (${rows.length}).`);
   }
 
@@ -428,6 +544,7 @@
     rows.forEach((row)=> state.selectedIds.delete(String(row && row.id || '').trim()));
     renderRecordsTable();
     renderSelectedList();
+    updateRecordsMeta();
     setStatus(recordsStatus, 'Filtre secimi temizlendi.');
   }
 
@@ -530,6 +647,7 @@
     state.selectedIds.clear();
     renderRecordsTable();
     renderSelectedList();
+    updateRecordsMeta();
     setStatus(analysisStatus, 'Secimler temizlendi.');
   }
 
@@ -555,6 +673,9 @@
       return;
     }
 
+    setSectionCollapsed('modePromptBody', true);
+    setSectionCollapsed('payloadBody', true);
+
     setBusyAnalysis(true);
     setStatus(analysisStatus, 'Gemini analizi baslatildi...');
 
@@ -573,6 +694,8 @@
     }
 
     analysisResult.value = String(resp.analysis || '');
+    renderAnalysisResult();
+    setResultView('rendered');
 
     const metaParts = [];
     if(typeof resp.includedCount === 'number' && typeof resp.totalCount === 'number'){
@@ -607,6 +730,7 @@
 
   function clearAnalysisResult(){
     analysisResult.value = '';
+    renderAnalysisResult();
     setStatus(analysisStatus, 'Analiz sonucu temizlendi.');
   }
 
@@ -655,6 +779,7 @@
   searchInput.addEventListener('input', ()=>{
     state.query = searchInput.value || '';
     renderRecordsTable();
+    updateRecordsMeta();
   });
 
   analysisPrompt.addEventListener('input', ()=>{
@@ -667,6 +792,18 @@
       selectAnalysisMode(mode, {keepPrompt:false});
     });
   });
+
+  collapseButtons.forEach((btn)=>{
+    btn.addEventListener('click', ()=>{
+      const bodyId = String(btn.dataset.bodyId || '').trim();
+      if(!bodyId) return;
+      const current = !!state.collapsedBodies[bodyId];
+      setSectionCollapsed(bodyId, !current);
+    });
+  });
+
+  resultViewRenderedBtn.addEventListener('click', ()=>setResultView('rendered'));
+  resultViewRawBtn.addEventListener('click', ()=>setResultView('raw'));
 
   refreshBtn.addEventListener('click', loadRecords);
   selectVisibleBtn.addEventListener('click', selectVisibleRecords);
@@ -704,5 +841,9 @@
   clearResultBtn.addEventListener('click', clearAnalysisResult);
 
   selectAnalysisMode('idea_timeline', {keepPrompt:false});
+  setSectionCollapsed('modePromptBody', false);
+  setSectionCollapsed('payloadBody', false);
+  setResultView('rendered');
+  renderAnalysisResult();
   loadRecords();
 })();
