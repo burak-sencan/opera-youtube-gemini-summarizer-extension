@@ -103,7 +103,7 @@ body.page-dashboard .section-help{ margin-bottom:4px; }
 body.page-dashboard .toolbar{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
+  gap:10px;
   align-items:center;
   flex:0 0 auto;
 }
@@ -113,8 +113,16 @@ body.page-dashboard .search-input{ flex:1 1 260px; }
 body.page-dashboard .toolbar-group{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
-  width:100%;
+  gap:10px;
+}
+
+body.page-dashboard .toolbar-group-main{
+  flex:1 1 100%;
+}
+
+body.page-dashboard .toolbar-group-right{
+  margin-left:auto;
+  flex:0 0 auto;
 }
 
 body.page-dashboard .records-meta{
@@ -149,10 +157,12 @@ body.page-dashboard .btn{
   background:var(--panel-2);
   color:var(--text);
   border-radius:10px;
-  padding:8px 12px;
+  padding:10px 14px;
   cursor:pointer;
   font-weight:700;
-  font-size:12px;
+  font-size:13px;
+  line-height:1;
+  min-height:38px;
   text-decoration:none;
   display:inline-flex;
   align-items:center;
@@ -165,6 +175,37 @@ body.page-dashboard .btn.primary{ background:var(--accent); border-color:var(--a
 body.page-dashboard .btn.danger{ background:rgba(230,96,96,.15); border-color:rgba(230,96,96,.45); color:#b81f1f; }
 
 body.page-dashboard .table-action-link{ margin-top:4px; }
+
+body.page-dashboard .menu-wrap{ position:relative; }
+
+body.page-dashboard .menu-popup{
+  position:absolute;
+  right:0;
+  top:calc(100% + 8px);
+  min-width:220px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:6px;
+  background:rgba(255,255,255,.98);
+  box-shadow:0 14px 28px rgba(15,23,36,.12);
+  z-index:6;
+}
+
+body.page-dashboard .menu-item{
+  width:100%;
+  border:1px solid transparent;
+  background:var(--panel-2);
+  color:var(--text);
+  border-radius:8px;
+  padding:10px 11px;
+  text-align:left;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:650;
+}
+
+body.page-dashboard .menu-item + .menu-item{ margin-top:6px; }
+body.page-dashboard .menu-item:hover{ border-color:rgba(29,123,246,.2); }
 
 body.page-dashboard .records-table-wrap{
   min-height:0;
@@ -200,14 +241,22 @@ body.page-dashboard th{
   z-index:2;
 }
 
-body.page-dashboard .col-select{ width:42px; }
+body.page-dashboard .col-select{ width:62px; }
 body.page-dashboard .col-channel{ width:170px; }
 body.page-dashboard .col-video-date{ width:120px; }
 body.page-dashboard .col-record-date{ width:150px; }
 body.page-dashboard .col-actions{ width:160px; }
 
+body.page-dashboard tbody tr{ cursor:pointer; }
 body.page-dashboard tbody tr:hover{ background:rgba(34,91,150,.06); }
 body.page-dashboard tr.active-row{ background:rgba(29,123,246,.08); }
+
+body.page-dashboard .row-check{
+  width:19px;
+  height:19px;
+  cursor:pointer;
+  accent-color:var(--accent);
+}
 
 body.page-dashboard .title-cell{
   min-width:220px;
@@ -239,6 +288,35 @@ body.page-dashboard .edit-form-grid{
   min-height:0;
   flex:1;
 }
+
+body.page-dashboard .summary-preview-wrap{
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--panel-2);
+  padding:8px;
+}
+
+body.page-dashboard .edit-summary-preview{
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+  padding:10px;
+  margin-top:6px;
+  max-height:180px;
+  overflow:auto;
+  font-size:13px;
+  line-height:1.55;
+  color:#1f2d3d;
+}
+
+body.page-dashboard .edit-summary-preview p{ margin:6px 0; }
+body.page-dashboard .edit-summary-preview ul,
+body.page-dashboard .edit-summary-preview ol{ margin:7px 0 9px 20px; }
+body.page-dashboard .edit-summary-preview li{ margin:4px 0; }
+body.page-dashboard .edit-summary-preview h1,
+body.page-dashboard .edit-summary-preview h2,
+body.page-dashboard .edit-summary-preview h3,
+body.page-dashboard .edit-summary-preview h4{ margin:8px 0 6px 0; font-size:14px; }
 
 body.page-dashboard .button-row{ display:flex; gap:8px; }
 body.page-dashboard .button-row-wrap{ flex-wrap:wrap; }
@@ -460,6 +538,13 @@ body.page-dashboard .analysis-result-rendered a{ color:#1d7bf6; }
 @media (max-width: 1320px){
   body.page-dashboard .records-layout,
   body.page-dashboard .analysis-layout{ grid-template-columns:1fr; }
+
+  body.page-dashboard .toolbar-group-right{
+    width:100%;
+    justify-content:flex-end;
+  }
+
+  body.page-dashboard .menu-popup{ min-width:200px; }
 
   body.page-dashboard .summary-snippet{ min-width:320px; }
   body.page-dashboard #editSummary{ min-height:200px; }

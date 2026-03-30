@@ -4,6 +4,18 @@ function setMsg(text){
   msgEl.textContent = String(text || '');
 }
 
+function normalizeUserErrorMessage(errorText){
+  const raw = String(errorText || '').trim();
+  const lower = raw.toLowerCase();
+  if(
+    lower.includes('could not establish connection') ||
+    lower.includes('receiving end does not exist')
+  ){
+    return 'Bu sayfada ozetleme aktif degil. Bir YouTube video sayfasi acip tekrar deneyin.';
+  }
+  return raw || 'Islem basarisiz oldu.';
+}
+
 function getActiveTab(){
   return new Promise((resolve)=>{
     chrome.tabs.query({active:true,currentWindow:true}, (tabs)=>{
@@ -25,6 +37,19 @@ function sendMessageToTab(tabId, payload){
   });
 }
 
+function sendRuntimeMessage(payload){
+  return new Promise((resolve)=>{
+    chrome.runtime.sendMessage(payload, (resp)=>{
+      const lastErr = chrome.runtime.lastError;
+      if(lastErr){
+        resolve({ok:false, error:lastErr.message || 'Arka plan iletisim hatasi'});
+        return;
+      }
+      resolve(resp || {ok:false, error:'Bos yanit'});
+    });
+  });
+}
+
 async function handleSummarize(){
   const tab = await getActiveTab();
   if(!tab || typeof tab.id !== 'number'){
@@ -39,7 +64,17 @@ async function handleSummarize(){
     return;
   }
 
-  setMsg((resp && resp.error) ? resp.error : 'Özet başlatılamadı.');
+  setMsg(normalizeUserErrorMessage(resp && resp.error ? resp.error : 'Ozet baslatilamadi.'));
+}
+
+async function handleOpenDashboard(){
+  setMsg('Dashboard aciliyor...');
+  const resp = await sendRuntimeMessage({action:'open_dashboard'});
+  if(resp && resp.ok){
+    setMsg('Dashboard acildi.');
+    return;
+  }
+  setMsg(`Dashboard acilamadi: ${normalizeUserErrorMessage(resp && resp.error ? resp.error : '')}`);
 }
 
 function handleOpenOptions(){
@@ -47,4 +82,5 @@ function handleOpenOptions(){
 }
 
 document.getElementById('summarize').addEventListener('click', handleSummarize);
+document.getElementById('openDashboard').addEventListener('click', handleOpenDashboard);
 document.getElementById('openOptions').addEventListener('click', handleOpenOptions);

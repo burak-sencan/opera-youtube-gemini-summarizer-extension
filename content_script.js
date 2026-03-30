@@ -15,6 +15,7 @@
   let pendingSummarySource = null;
   let latestSummaryContext = null;
   let drawerSaveResetTimer = null;
+  let drawerDashboardResetTimer = null;
   const SUMMARY_PENDING_TIMEOUT_MS = 75_000;
   let summaryPendingTimeoutHandle = null;
 
@@ -194,6 +195,10 @@
     return document.getElementById('gemini-drawer-save-btn');
   }
 
+  function getDrawerDashboardButton(){
+    return document.getElementById('gemini-drawer-dashboard-btn');
+  }
+
   function updateDrawerSaveButtonState(){
     const saveBtn = getDrawerSaveButton();
     if(!saveBtn) return;
@@ -236,6 +241,56 @@
     }, 1500);
   }
 
+  function flashDrawerDashboardButton(text, tone){
+    const dashboardBtn = getDrawerDashboardButton();
+    if(!dashboardBtn) return;
+
+    if(drawerDashboardResetTimer){
+      clearTimeout(drawerDashboardResetTimer);
+      drawerDashboardResetTimer = null;
+    }
+
+    dashboardBtn.textContent = String(text || 'Dashboard');
+    if(tone === 'ok'){
+      dashboardBtn.style.borderColor = 'rgba(83,181,127,.65)';
+      dashboardBtn.style.background = 'rgba(83,181,127,.16)';
+    } else if(tone === 'error'){
+      dashboardBtn.style.borderColor = 'rgba(230,96,96,.65)';
+      dashboardBtn.style.background = 'rgba(230,96,96,.16)';
+    } else {
+      dashboardBtn.style.borderColor = 'rgba(255,255,255,.14)';
+      dashboardBtn.style.background = 'rgba(255,255,255,.08)';
+    }
+
+    drawerDashboardResetTimer = setTimeout(()=>{
+      drawerDashboardResetTimer = null;
+      const btn = getDrawerDashboardButton();
+      if(!btn) return;
+      btn.textContent = 'Dashboard';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.style.borderColor = 'rgba(255,255,255,.14)';
+      btn.style.background = 'rgba(255,255,255,.08)';
+    }, 1500);
+  }
+
+  function tryDirectDashboardOpenFallback(){
+    try{
+      const url = chrome.runtime.getURL('dashboard.html');
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
   function saveCurrentSummaryFromDrawer(){
     if(summaryPending){
       flashDrawerSaveButton('Bekleyin', 'error');
@@ -276,8 +331,36 @@
 
   function openDashboardFromDrawer(){
     try{
-      chrome.runtime.sendMessage({action:'open_dashboard'}, ()=>{});
-    }catch(e){}
+      const dashboardBtn = getDrawerDashboardButton();
+      if(dashboardBtn){
+        dashboardBtn.disabled = true;
+        dashboardBtn.style.opacity = '0.72';
+        dashboardBtn.style.cursor = 'wait';
+        dashboardBtn.textContent = 'Aciliyor';
+      }
+
+      chrome.runtime.sendMessage({action:'open_dashboard'}, (resp)=>{
+        const runtimeError = chrome.runtime.lastError;
+        if(runtimeError || !(resp && resp.ok)){
+          const fallbackOk = tryDirectDashboardOpenFallback();
+          if(fallbackOk){
+            flashDrawerDashboardButton('Acildi', 'ok');
+            return;
+          }
+          flashDrawerDashboardButton('Hata', 'error');
+          return;
+        }
+
+        flashDrawerDashboardButton('Acildi', 'ok');
+      });
+    }catch(e){
+      const fallbackOk = tryDirectDashboardOpenFallback();
+      if(fallbackOk){
+        flashDrawerDashboardButton('Acildi', 'ok');
+        return;
+      }
+      flashDrawerDashboardButton('Hata', 'error');
+    }
   }
 
   function showSummaryDrawer(summary, title, isPending){

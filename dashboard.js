@@ -8,10 +8,16 @@
   const refreshBtn = document.getElementById('refreshBtn');
   const selectVisibleBtn = document.getElementById('selectVisibleBtn');
   const clearVisibleBtn = document.getElementById('clearVisibleBtn');
+  const selectDailyBtn = document.getElementById('selectDailyBtn');
+  const selectWeeklyBtn = document.getElementById('selectWeeklyBtn');
+  const selectMonthlyBtn = document.getElementById('selectMonthlyBtn');
   const exportSelectedBtn = document.getElementById('exportSelectedBtn');
   const exportAllBtn = document.getElementById('exportAllBtn');
   const importBtn = document.getElementById('importBtn');
   const importFileInput = document.getElementById('importFileInput');
+  const transferMenuWrap = document.getElementById('transferMenuWrap');
+  const transferMenuBtn = document.getElementById('transferMenuBtn');
+  const transferMenu = document.getElementById('transferMenu');
   const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
   const recordsTbody = document.getElementById('recordsTbody');
   const recordsStatus = document.getElementById('recordsStatus');
@@ -22,6 +28,7 @@
   const editVideoUrl = document.getElementById('editVideoUrl');
   const editUploadDate = document.getElementById('editUploadDate');
   const editSummary = document.getElementById('editSummary');
+  const editSummaryPreview = document.getElementById('editSummaryPreview');
   const saveEditBtn = document.getElementById('saveEditBtn');
   const deleteActiveBtn = document.getElementById('deleteActiveBtn');
   const editStatus = document.getElementById('editStatus');
@@ -51,33 +58,47 @@
       title: 'Fikir Evrimi',
       prompt: [
         'Secili kayitlari tarih sirasina gore incele.',
-        'Ayni konuya yaklasimin zamanla nasil degistigini ortaya koy.',
-        'Ilk donem ile son donem gorusleri arasindaki farki net karsilastir.',
+        'Her donemde altin, gumus, nasdaq, bist100 gibi piyasalardaki baskin gorusu ozetle.',
+        'Ilk donem ile son donem gorusleri arasindaki yon farkini net karsilastir.',
         'Her kritik degisim icin ilgili video basliklariyla kisa kanit ekle.'
       ].join(' ')
     },
     consistency_map: {
       title: 'Tutarlilik Haritasi',
       prompt: [
-        'Secili kayitlar icinde birbirini destekleyen ve celisen ifadeleri cikar.',
-        'Konu bazli tutarlilik puani ve kisa gerekce ver.',
-        'Varsa belirgin celiskileri madde madde yaz ve olasi nedenleri belirt.'
+        'Secili kayitlari piyasa bazinda (altin/gumus/nasdaq/bist100 vb.) karsilastir.',
+        'Tutarli tezleri, celiskili yorumlari ve celiski siddetini cikar.',
+        'Her celiski icin hangi kanal ne demis kanitla belirt.'
       ].join(' ')
     },
-    argument_shift: {
-      title: 'Arguman Donusumu',
+    consensus_view: {
+      title: 'Konsensus Gorunumu',
       prompt: [
-        'Konusmacinin ana argumanini donemlere ayir.',
-        'Hangi donemlerde hangi gerekcelere yaslandigini goster.',
-        'Donusum noktalarini ve bunlarin olasi tetikleyicilerini cikar.'
+        'Secili kayitlardan toplu gorusu cikar.',
+        'Her piyasa icin baskin yonu (yukselis/dusus/yatay), bu yone katilan kanal sayisini ve karsi gorusleri yaz.',
+        'Sonunda genel konsensus ozetini ver.'
       ].join(' ')
     },
     risk_opportunity: {
       title: 'Risk ve Firsat',
       prompt: [
-        'Kayitlardan cikan riskleri ve firsatlari ayri basliklarda topla.',
-        'Etkisi yuksek maddeleri oncelik sirasina gore ver.',
-        'Her madde icin kisa uygulanabilir oneri ekle.'
+        'Kayitlardan cikan risk ve firsatlari kisa/orta vade olarak ayir.',
+        'Her madde icin olasilik-etki degerlendirmesi yap ve korunma/aksiyon onerisi ekle.',
+        'En kritik 5 maddeyi onceliklendir.'
+      ].join(' ')
+    },
+    market_direction_board: {
+      title: 'Piyasa Yon Karnesi',
+      prompt: [
+        'Altin, gumus, nasdaq, bist100 ve kayitlarda gecen diger piyasalari birlikte ozetle.',
+        'Her piyasa icin mevcut yon, guc derecesi (zayif/orta/guclu), temel gerekce ve belirsizlik notu ver.'
+      ].join(' ')
+    },
+    catalyst_watch: {
+      title: 'Tetikleyici Takibi',
+      prompt: [
+        'Kayitlarda gecen tetikleyicileri (faiz karari, enflasyon verisi, jeopolitik gelisme, bilanco vb.) cikar.',
+        'Her tetikleyici icin hangi piyasayi nasil etkileyebilecegini ve izleme onceligini belirt.'
       ].join(' ')
     },
     custom: {
@@ -218,6 +239,95 @@
     if(!text) return '-';
     if(text.length <= limit) return text;
     return `${text.slice(0, limit)}...`;
+  }
+
+  function parseDateValue(value){
+    const raw = String(value || '').trim();
+    if(!raw) return null;
+    const d = new Date(raw);
+    if(Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
+  function isSameLocalDay(a, b){
+    if(!a || !b) return false;
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+  }
+
+  function selectRecordsByPeriod(period){
+    const mode = String(period || '').trim();
+    if(!state.records.length){
+      setStatus(recordsStatus, 'Secmek icin kayit yok.');
+      return;
+    }
+
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let label = 'Gunluk';
+    let rangeStart = new Date(startToday);
+    if(mode === 'weekly'){
+      label = 'Haftalik';
+      rangeStart.setDate(rangeStart.getDate() - 6);
+    } else if(mode === 'monthly'){
+      label = 'Aylik';
+      rangeStart.setDate(rangeStart.getDate() - 29);
+    }
+
+    state.selectedIds.clear();
+    let matched = 0;
+
+    state.records.forEach((row)=>{
+      const id = String(row && row.id || '').trim();
+      if(!id) return;
+
+      const d = parseDateValue(row.createdAt || row.updatedAt || row.uploadDate);
+      if(!d) return;
+
+      const include = mode === 'daily'
+        ? isSameLocalDay(d, now)
+        : (d.getTime() >= rangeStart.getTime() && d.getTime() <= now.getTime());
+
+      if(!include) return;
+      state.selectedIds.add(id);
+      matched++;
+    });
+
+    renderRecordsTable();
+    renderSelectedList();
+    updateRecordsMeta();
+    if(!matched){
+      setStatus(recordsStatus, `${label} seciminde kayit bulunamadi.`);
+      return;
+    }
+    setStatus(recordsStatus, `${label} secimi uygulandi (${matched} kayit).`);
+  }
+
+  function normalizeSummaryPreviewText(value){
+    let text = String(value || '').replace(/\r\n/g, '\n').trim();
+    if(!text) return '';
+
+    // Convert compact list-like patterns to readable lines for preview rendering.
+    text = text
+      .replace(/\s*(\d+[\.)])\s*/g, '\n$1 ')
+      .replace(/\s*([\-*•])\s+/g, '\n$1 ')
+      .replace(/\s*(Kisa Sonuc|Ana Bulgular|Kanit Noktalari|Sonraki Aksiyonlar)\s*:\s*/gi, '\n\n$1:\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    return text;
+  }
+
+  function renderEditSummaryPreview(){
+    if(!editSummaryPreview) return;
+    const normalized = normalizeSummaryPreviewText(editSummary.value || '');
+    if(!normalized){
+      editSummaryPreview.innerHTML = '<p class="muted">Onizleme icin ozet metni girin.</p>';
+      return;
+    }
+    editSummaryPreview.innerHTML = renderMarkdownToHtml(normalized);
   }
 
   function updateRecordsMeta(){
@@ -364,6 +474,7 @@
     editVideoUrl.value = row ? String(row.videoUrl || '') : '';
     editUploadDate.value = row ? String(normalizeVideoDate(row.uploadDate) || '') : '';
     editSummary.value = row ? String(row.summary || '') : '';
+    renderEditSummaryPreview();
 
     renderRecordsTable();
   }
@@ -399,7 +510,7 @@
 
       return `
         <tr class="${activeClass}" data-record-id="${id}">
-          <td><input type="checkbox" data-check-id="${id}" ${checked} /></td>
+          <td><input class="row-check" type="checkbox" data-check-id="${id}" ${checked} /></td>
           <td><div class="title-cell" title="${title}">${title}</div></td>
           <td><div class="summary-snippet" title="${summary}">${summary}</div></td>
           <td><div class="meta-stack" title="${channel}">${channel}</div></td>
@@ -549,6 +660,7 @@
   }
 
   function exportSelectedRecords(){
+    closeTransferMenu();
     const selected = getSelectedRecords();
     if(!selected.length){
       setStatus(recordsStatus, 'Disa aktarim icin secili kayit yok.');
@@ -559,6 +671,7 @@
   }
 
   function exportAllRecords(){
+    closeTransferMenu();
     if(!state.records.length){
       setStatus(recordsStatus, 'Disa aktarim icin kayit yok.');
       return;
@@ -568,6 +681,7 @@
   }
 
   async function importRecordsFromFile(file){
+    closeTransferMenu();
     if(!file) return;
 
     let parsed;
@@ -608,6 +722,18 @@
     analysisTab.classList.toggle('hidden', next !== 'analysis');
 
     if(next === 'analysis') renderSelectedList();
+  }
+
+  function setTransferMenuOpen(isOpen){
+    if(!transferMenu || !transferMenuBtn || !transferMenuWrap) return;
+    const open = !!isOpen;
+    transferMenu.classList.toggle('hidden', !open);
+    transferMenuWrap.classList.toggle('open', open);
+    transferMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function closeTransferMenu(){
+    setTransferMenuOpen(false);
   }
 
   async function copyAnalysisPayload(){
@@ -766,6 +892,8 @@
     const row = target.closest('tr[data-record-id]');
     if(row){
       const id = row.getAttribute('data-record-id');
+      const shouldSelect = !state.selectedIds.has(String(id || '').trim());
+      toggleSelection(id, shouldSelect);
       setActiveRecord(id);
     }
   });
@@ -780,6 +908,10 @@
     state.query = searchInput.value || '';
     renderRecordsTable();
     updateRecordsMeta();
+  });
+
+  editSummary.addEventListener('input', ()=>{
+    renderEditSummaryPreview();
   });
 
   analysisPrompt.addEventListener('input', ()=>{
@@ -808,9 +940,28 @@
   refreshBtn.addEventListener('click', loadRecords);
   selectVisibleBtn.addEventListener('click', selectVisibleRecords);
   clearVisibleBtn.addEventListener('click', clearVisibleSelection);
+  selectDailyBtn.addEventListener('click', ()=>selectRecordsByPeriod('daily'));
+  selectWeeklyBtn.addEventListener('click', ()=>selectRecordsByPeriod('weekly'));
+  selectMonthlyBtn.addEventListener('click', ()=>selectRecordsByPeriod('monthly'));
   exportSelectedBtn.addEventListener('click', exportSelectedRecords);
   exportAllBtn.addEventListener('click', exportAllRecords);
-  importBtn.addEventListener('click', ()=> importFileInput.click());
+  importBtn.addEventListener('click', ()=>{
+    closeTransferMenu();
+    importFileInput.click();
+  });
+
+  transferMenuBtn.addEventListener('click', (event)=>{
+    event.preventDefault();
+    event.stopPropagation();
+    const willOpen = transferMenu.classList.contains('hidden');
+    setTransferMenuOpen(willOpen);
+  });
+
+  document.addEventListener('click', (event)=>{
+    if(!transferMenuWrap) return;
+    if(transferMenuWrap.contains(event.target)) return;
+    closeTransferMenu();
+  });
 
   importFileInput.addEventListener('change', async ()=>{
     const file = importFileInput.files && importFileInput.files[0];
@@ -844,6 +995,8 @@
   setSectionCollapsed('modePromptBody', false);
   setSectionCollapsed('payloadBody', false);
   setResultView('rendered');
+  setTransferMenuOpen(false);
+  renderEditSummaryPreview();
   renderAnalysisResult();
   loadRecords();
 })();

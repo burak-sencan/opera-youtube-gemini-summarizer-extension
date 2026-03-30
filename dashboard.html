@@ -25,14 +25,24 @@
           <div class="toolbar">
             <input id="searchInput" class="search-input" type="text" placeholder="Başlık, kanal, özet, URL içinde ara..." />
             <div class="records-meta" id="recordsMeta">Toplam: 0 | Seçili: 0 | Filtre: 0</div>
-            <div class="toolbar-group">
+            <div class="toolbar-group toolbar-group-main">
               <button class="btn" id="refreshBtn">Yenile</button>
-              <button class="btn" id="selectVisibleBtn">Filtredekileri Seç</button>
-              <button class="btn" id="clearVisibleBtn">Filtre Seçimini Temizle</button>
-              <button class="btn" id="exportSelectedBtn">Seçileni Dışa Aktar</button>
-              <button class="btn" id="exportAllBtn">Tümünü Dışa Aktar</button>
-              <button class="btn" id="importBtn">İçe Aktar</button>
-              <button class="btn danger" id="deleteSelectedBtn">Seçiliyi Sil</button>
+              <button class="btn" id="selectVisibleBtn">Filtreyi Seç</button>
+              <button class="btn" id="clearVisibleBtn">Filtreyi Temizle</button>
+              <button class="btn" id="selectDailyBtn">Günlük Seç</button>
+              <button class="btn" id="selectWeeklyBtn">Haftalık Seç</button>
+              <button class="btn" id="selectMonthlyBtn">Aylık Seç</button>
+              <button class="btn danger" id="deleteSelectedBtn">Sil</button>
+            </div>
+            <div class="toolbar-group toolbar-group-right">
+              <div class="menu-wrap" id="transferMenuWrap">
+                <button class="btn" id="transferMenuBtn" aria-haspopup="true" aria-expanded="false">Aktar</button>
+                <div class="menu-popup hidden" id="transferMenu">
+                  <button class="menu-item" id="exportSelectedBtn">Seçileni Dışa Aktar</button>
+                  <button class="menu-item" id="exportAllBtn">Tümünü Dışa Aktar</button>
+                  <button class="menu-item" id="importBtn">İçe Aktar</button>
+                </div>
+              </div>
               <input id="importFileInput" type="file" accept="application/json" class="hidden" />
             </div>
           </div>
@@ -58,13 +68,17 @@
 
         <div class="col">
           <h3 class="section-title">Kayıt Düzenle</h3>
-          <div class="muted section-help">Satıra tıklayıp içeriği düzenleyebilirsiniz.</div>
+          <div class="muted section-help">Satıra tıklayarak kaydı seçip içeriği düzenleyebilirsiniz.</div>
           <div class="edit-form-grid">
             <input id="editTitle" type="text" placeholder="Başlık" />
             <input id="editChannel" type="text" placeholder="Kanal adı" />
             <input id="editVideoUrl" type="text" placeholder="Video URL" />
             <input id="editUploadDate" type="text" placeholder="Video yüklenme tarihi (YYYY-AA-GG)" />
             <textarea id="editSummary" placeholder="Özet içeriği"></textarea>
+            <div class="summary-preview-wrap">
+              <div class="muted">Özet Önizleme</div>
+              <div id="editSummaryPreview" class="edit-summary-preview"></div>
+            </div>
             <div class="button-row">
               <button class="btn primary" id="saveEditBtn">Kaydı Güncelle</button>
               <button class="btn danger" id="deleteActiveBtn">Kaydı Sil</button>
@@ -98,8 +112,10 @@
                 <div class="mode-bar">
                   <button class="mode-btn" data-mode="idea_timeline">Fikir Evrimi</button>
                   <button class="mode-btn" data-mode="consistency_map">Tutarlılık Haritası</button>
-                  <button class="mode-btn" data-mode="argument_shift">Argüman Dönüşümü</button>
+                  <button class="mode-btn" data-mode="consensus_view">Konsensüs Görünümü</button>
                   <button class="mode-btn" data-mode="risk_opportunity">Risk ve Fırsat</button>
+                  <button class="mode-btn" data-mode="market_direction_board">Piyasa Yön Karnesi</button>
+                  <button class="mode-btn" data-mode="catalyst_watch">Tetikleyici Takibi</button>
                   <button class="mode-btn" data-mode="custom">Özel Mod</button>
                 </div>
                 <textarea id="analysisPrompt" placeholder="Analiz talebinizi yazın. Mod butonları örnek promptları otomatik doldurur."></textarea>
